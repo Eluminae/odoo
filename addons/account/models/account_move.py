@@ -903,22 +903,30 @@ class AccountMove(models.Model):
             :param payment_terms_lines:     The current payment terms lines.
             :return:                        An account.account record.
             '''
+            found_account_id = False
             if payment_terms_lines:
                 # Retrieve account from previous payment terms lines in order to allow the user to set a custom one.
-                return payment_terms_lines[0].account_id
-            elif self.partner_id:
+                found_account_id = payment_terms_lines[0].account_id
+            if not found_account_id and self.partner_id:
                 # Retrieve account from partner.
                 if self.is_sale_document(include_receipts=True):
-                    return self.partner_id.property_account_receivable_id
+                    found_account_id = self.partner_id.property_account_receivable_id
                 else:
-                    return self.partner_id.property_account_payable_id
-            else:
+                    found_account_id = self.partner_id.property_account_payable_id
+            account_type = 'receivable' if self.move_type in ('out_invoice', 'out_refund', 'out_receipt') else 'payable'
+            if not found_account_id:
                 # Search new account.
                 domain = [
                     ('company_id', '=', self.company_id.id),
-                    ('internal_type', '=', 'receivable' if self.move_type in ('out_invoice', 'out_refund', 'out_receipt') else 'payable'),
+                    ('internal_type', '=', account_type),
                 ]
-                return self.env['account.account'].search(domain, limit=1)
+                found_account_id = self.env['account.account'].search(domain, limit=1)
+
+            if not found_account_id:
+                raise ValidationError(_('We cannot find the payable account for this invoice. Please either :\n'
+                                        '- Configure the property accounts for the partner.\n'
+                                        '- Create a {} type account for this company.\n'.format(account_type)))
+            return found_account_id
 
         def _compute_payment_terms(self, date, total_balance, total_amount_currency):
             ''' Compute the payment terms.
