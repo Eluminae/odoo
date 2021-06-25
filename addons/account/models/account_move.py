@@ -919,13 +919,14 @@ class AccountMove(models.Model):
                 domain = [
                     ('company_id', '=', self.company_id.id),
                     ('internal_type', '=', account_type),
+                    ('currency_id', '=', self.currency_id.id),
                 ]
                 found_account_id = self.env['account.account'].search(domain, limit=1)
 
             if not found_account_id:
                 raise ValidationError(_('We cannot find the payable account for this invoice. Please either :\n'
                                         '- Configure the property accounts for the partner.\n'
-                                        '- Create a {} type account for this company.\n'.format(account_type)))
+                                        '- Create a {} type account for this company and currency.\n'.format(account_type)))
             return found_account_id
 
         def _compute_payment_terms(self, date, total_balance, total_amount_currency):
